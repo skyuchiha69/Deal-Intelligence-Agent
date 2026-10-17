@@ -1,0 +1,20 @@
+{
+  "name": "deal-intelligence-agent",
+  "version": "1.0.0",
+  "description": "AI-assisted sales intelligence prototype with organizational memory developed for Hack Baroda.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "deal-intelligence",
+    "sales-copilot",
+    "organizational-memory",
+    "hack-baroda",
+    "explainable-ai",
+    "d3-graph"
+  ],
+  "author": "Shubham Ahir",
+  "license": "UNLICENSED"
+}
