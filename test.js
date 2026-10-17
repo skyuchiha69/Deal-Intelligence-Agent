@@ -79,10 +79,14 @@ global.d3 = {
   select: () => {
     const chain = {
       append: () => chain,
+      insert: () => chain,
       attr: () => chain,
       style: () => chain,
       call: () => chain,
       on: () => chain,
+      html: () => chain,
+      each: (fn) => chain,
+      filter: () => chain,
       selectAll: () => ({
         data: () => ({
           enter: () => ({
@@ -120,14 +124,23 @@ global.d3 = {
       on: () => sim,
       alpha: () => sim,
       alphaTarget: () => sim,
+      alphaDecay: () => sim,
+      velocityDecay: () => sim,
       restart: () => sim,
       stop: () => sim
     };
     return sim;
   },
-  forceLink: () => ({ id: () => ({ distance: () => ({}) }) }),
-  forceManyBody: () => ({ strength: () => ({}) }),
-  forceCenter: () => ({}),
+  forceLink: () => {
+    const fl = {
+      id: () => fl,
+      distance: () => fl,
+      strength: () => fl
+    };
+    return fl;
+  },
+  forceManyBody: () => ({ strength: () => ({ distanceMax: () => ({}) }) }),
+  forceCenter: () => ({ strength: () => ({}) }),
   forceCollide: () => ({ radius: () => ({ iterations: () => ({}) }) }),
   drag: () => ({ on: () => ({ on: () => ({ on: () => ({}) }) }) })
 };

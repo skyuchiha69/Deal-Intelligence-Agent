@@ -2689,53 +2689,57 @@ const App = {
       <div class="graph-layout">
         <div class="graph-main">
           <div class="graph-header">
-            <div>
-              <h1 class="view-title">Organizational Memory Graph</h1>
-              <p class="view-subtitle">Interactive visualization of deals, stakeholders, objections, strategies, and outcomes.</p>
+            <div class="graph-header-left">
+              <div class="graph-title-row">
+                <h1 class="view-title" style="margin-bottom:0;">Organizational Memory Graph</h1>
+                <div id="graph-status-badge" class="graph-status-badge">
+                  Showing <strong>23</strong> nodes • <span>500 deals in memory</span>
+                </div>
+              </div>
+              <p class="view-subtitle" style="margin-bottom:0;">Interactive knowledge graph connecting deals, stakeholders, objections, strategies, and outcomes.</p>
             </div>
             <div class="graph-actions">
               <button class="btn btn-ghost" id="graph-density-btn" onclick="App.toggleGraphDensity()">${(this._graphDensity || 'pipeline') === 'pipeline' ? '🌐 View Full Web' : '⚡ Pipeline Focus'}</button>
               <button class="btn btn-primary btn-glow" onclick="MemoryGraph.animateReasoningPath()">✨ Show Why</button>
-              <button class="btn btn-ghost" onclick="MemoryGraph.resetHighlights()">Reset View</button>
+              <button class="btn btn-ghost" onclick="MemoryGraph.resetView()">⟲ Reset View</button>
             </div>
           </div>
 
           <div class="graph-controls">
-            <div class="graph-search">
-              <input type="text" id="graph-search-input" class="form-input" placeholder="🔍 Search nodes (company, role, objection...)" />
+            <div class="graph-controls-top">
+              <div class="graph-search">
+                <input type="text" id="graph-search-input" class="form-input" placeholder="🔍 Search nodes (company, role, objection, strategy...)" />
+                <button class="graph-search-clear" id="graph-search-clear" onclick="MemoryGraph.clearSearch()" title="Clear search">✕</button>
+              </div>
+              <div class="graph-filters" id="graph-filters">
+                <button class="graph-filter-btn active" data-type="all"><span class="gf-dot" style="background:#fff"></span>All</button>
+                <button class="graph-filter-btn active" data-type="deal"><span class="gf-dot" style="background:#00e5ff"></span>Deals</button>
+                <button class="graph-filter-btn active" data-type="stakeholder"><span class="gf-dot" style="background:#b388ff"></span>Stakeholders</button>
+                <button class="graph-filter-btn active" data-type="objection"><span class="gf-dot" style="background:#ff8c42"></span>Objections</button>
+                <button class="graph-filter-btn active" data-type="strategy"><span class="gf-dot" style="background:#00e5a0"></span>Strategies</button>
+                <button class="graph-filter-btn active" data-type="outcome"><span class="gf-dot" style="background:#ffd93d"></span>Outcomes</button>
+              </div>
             </div>
-            <div class="graph-filters" id="graph-filters">
-              <button class="graph-filter-btn active" data-type="all"><span class="gf-dot" style="background:#fff"></span>All</button>
-              <button class="graph-filter-btn active" data-type="deal"><span class="gf-dot" style="background:#00e5ff"></span>Deals</button>
-              <button class="graph-filter-btn active" data-type="stakeholder"><span class="gf-dot" style="background:#b388ff"></span>Stakeholders</button>
-              <button class="graph-filter-btn active" data-type="objection"><span class="gf-dot" style="background:#ff8c42"></span>Objections</button>
-              <button class="graph-filter-btn active" data-type="strategy"><span class="gf-dot" style="background:#00e5a0"></span>Strategies</button>
-              <button class="graph-filter-btn active" data-type="outcome"><span class="gf-dot" style="background:#ffd93d"></span>Outcomes</button>
-            </div>
-          </div>
-
-          <div class="graph-legend">
-            <span class="graph-legend-item"><span class="gl-dot" style="background:#00e5ff"></span>Deal</span>
-            <span class="graph-legend-item"><span class="gl-dot" style="background:#b388ff"></span>Stakeholder</span>
-            <span class="graph-legend-item"><span class="gl-dot" style="background:#ff8c42"></span>Objection</span>
-            <span class="graph-legend-item"><span class="gl-dot" style="background:#00e5a0"></span>Strategy</span>
-            <span class="graph-legend-item"><span class="gl-dot" style="background:#00e5a0"></span>Won</span>
-            <span class="graph-legend-item"><span class="gl-dot" style="background:#ff5252"></span>Lost</span>
-            <span class="graph-legend-item"><span class="gl-dot" style="background:#ffd93d"></span>Active</span>
+            <div id="graph-search-status" class="graph-search-status" style="display:none;"></div>
           </div>
 
           <div id="d3-graph-container" class="d3-graph-container">
-            <!-- D3 renders here -->
+            <div class="graph-zoom-controls">
+              <button class="zoom-btn" onclick="MemoryGraph.zoomIn()" title="Zoom In">+</button>
+              <button class="zoom-btn" onclick="MemoryGraph.zoomOut()" title="Zoom Out">−</button>
+              <button class="zoom-btn" onclick="MemoryGraph.resetZoom()" title="Reset Pan & Zoom">⟲</button>
+            </div>
           </div>
         </div>
+
         <div class="graph-side-panel" id="graph-side-panel">
-          <div class="empty-panel">
-            <div class="empty-icon">🕸️</div>
-            <p>Click on any node in the graph to view details and memory connections.</p>
-          </div>
+          <!-- Overview or node details rendered here -->
         </div>
       </div>
     `;
+
+    // Initialize Default Overview in Side Panel
+    this.renderGraphOverviewPanel();
 
     // Search handler
     const searchInput = document.getElementById('graph-search-input');
@@ -2754,7 +2758,6 @@ const App = {
         const type = btn.dataset.type;
 
         if (type === 'all') {
-          // Toggle all
           const allBtns = filtersContainer.querySelectorAll('.graph-filter-btn');
           const allActive = [...allBtns].every(b => b.classList.contains('active'));
           allBtns.forEach(b => allActive ? b.classList.remove('active') : b.classList.add('active'));
@@ -2762,13 +2765,12 @@ const App = {
           btn.classList.toggle('active');
         }
 
-        // Collect active types
         const activeTypes = [...filtersContainer.querySelectorAll('.graph-filter-btn.active')]
           .map(b => b.dataset.type)
           .filter(t => t !== 'all');
 
         if (typeof MemoryGraph !== 'undefined') {
-          if (activeTypes.length === 5) { // All 5 node types
+          if (activeTypes.length === 5) {
             MemoryGraph.resetHighlights();
           } else {
             MemoryGraph.filterByType(activeTypes);
@@ -2787,6 +2789,93 @@ const App = {
     }, 100);
   },
 
+  renderGraphOverviewPanel() {
+    const panel = document.getElementById('graph-side-panel');
+    if (!panel) return;
+
+    const totalDeals = (typeof DATA !== 'undefined' && DATA.deals) ? DATA.deals.length : 500;
+    const totalStakeholders = (typeof DATA !== 'undefined' && DATA.stakeholders) ? DATA.stakeholders.length : 1798;
+    const totalObjections = (typeof DATA !== 'undefined' && DATA.objections) ? DATA.objections.length : 1213;
+
+    // Grab deals currently in view for quick focus chips
+    const dealsInView = (typeof MemoryGraph !== 'undefined' && MemoryGraph.nodesData && MemoryGraph.nodesData.length > 0)
+      ? MemoryGraph.nodesData.filter(n => n.type === 'deal').slice(0, 4)
+      : [];
+
+    panel.innerHTML = `
+      <div class="panel-header">
+        <div class="panel-header-top">
+          <span class="panel-type-badge deal">Knowledge Graph</span>
+          <span class="tt-connections">v2.4 Active</span>
+        </div>
+        <h2>Organizational Memory Engine</h2>
+        <span class="panel-subtitle">Multi-dimensional relationship network connecting deals, objections, and learned win patterns.</span>
+      </div>
+      <div class="panel-body overview-panel">
+        <div class="overview-stats">
+          <div class="os-card">
+            <span class="os-num">${totalDeals}</span>
+            <span class="os-label">💼 Total Deals</span>
+          </div>
+          <div class="os-card">
+            <span class="os-num">${totalStakeholders}</span>
+            <span class="os-label">👥 Stakeholders</span>
+          </div>
+          <div class="os-card">
+            <span class="os-num">${totalObjections}</span>
+            <span class="os-label">🛡️ Objections</span>
+          </div>
+          <div class="os-card">
+            <span class="os-num">850+</span>
+            <span class="os-label">🎯 Learned Patterns</span>
+          </div>
+        </div>
+
+        <div class="overview-guide">
+          <div class="panel-section-title">Interactive Guide</div>
+          <div class="guide-step">
+            <span class="guide-icon">👆</span>
+            <div><strong>Select Any Node</strong> to inspect immediate relationships, metrics, and deal context.</div>
+          </div>
+          <div class="guide-step">
+            <span class="guide-icon">🔍</span>
+            <div><strong>Search</strong> to highlight specific companies, roles, or objection categories.</div>
+          </div>
+          <div class="guide-step">
+            <span class="guide-icon">✨</span>
+            <div><strong>Show Why</strong> traces the step-by-step reasoning chain for recommendation paths.</div>
+          </div>
+          <div class="guide-step">
+            <span class="guide-icon">⚡</span>
+            <div><strong>Expand Neighborhood</strong> dynamically pulls connected database records into view.</div>
+          </div>
+        </div>
+
+        ${dealsInView.length > 0 ? `
+          <div>
+            <div class="panel-section-title">Featured Deals in View</div>
+            <div class="recommended-nodes-list">
+              ${dealsInView.map(d => `
+                <button class="rec-node-chip" id="rec-btn-${d.id}" onclick="MemoryGraph.selectNode('${d.id}')">
+                  💼 ${d.label || d.data?.company}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+      <div class="panel-footer">
+        <button class="btn btn-primary full-width" onclick="MemoryGraph.animateReasoningPath()">
+          ✨ Trace Reasoning Chain (Show Why)
+        </button>
+      </div>
+    `;
+
+    panel.classList.remove('animate-slide-in');
+    void panel.offsetWidth;
+    panel.classList.add('animate-slide-in');
+  },
+
   showGraphNodeDetails(node) {
     const panel = document.getElementById('graph-side-panel');
     if (!panel) return;
@@ -2795,38 +2884,95 @@ const App = {
 
     if (node.type === 'deal') {
       const deal = node.data;
-      const objections = ObjectionAgent.getDealObjections(deal.id);
-      const stakeholders = StakeholderAgent.getDealStakeholders(deal.id);
-      
+      const objections = (typeof ObjectionAgent !== 'undefined') ? ObjectionAgent.getDealObjections(deal.id) : [];
+      const stakeholders = (typeof StakeholderAgent !== 'undefined') ? StakeholderAgent.getDealStakeholders(deal.id) : [];
+      const statusColor = deal.status === 'won' ? '#00e5a0' : (deal.status === 'lost' ? '#ff5252' : '#ffd93d');
+
       content = `
         <div class="panel-header">
-          <span class="panel-type-badge deal">Deal</span>
+          <div class="panel-header-top">
+            <span class="panel-type-badge deal">Deal Context</span>
+            <button class="panel-close-btn" onclick="MemoryGraph.deselectAll()" title="Close details">✕</button>
+          </div>
           <h2>${deal.company}</h2>
-          <span class="panel-subtitle">${deal.industry} • $${(deal.value/1000).toFixed(0)}K</span>
+          <span class="panel-subtitle">${deal.industry} • ${deal.stage} Stage</span>
         </div>
         <div class="panel-body">
-          <div class="panel-section">
-            <h3>Stakeholders (${stakeholders.length})</h3>
-            <div class="tag-list">
-              ${stakeholders.map(s => `<span class="tag">👤 ${s.role}</span>`).join('')}
+          <div class="panel-stats-grid">
+            <div class="panel-stat-card">
+              <div class="panel-stat-label">Deal Value</div>
+              <div class="panel-stat-value">$${(deal.value / 1000).toFixed(0)}K</div>
+            </div>
+            <div class="panel-stat-card">
+              <div class="panel-stat-label">Win Probability</div>
+              <div class="panel-stat-value" style="color: ${deal.winProbability >= 70 ? '#00e5a0' : '#ffd93d'};">${deal.winProbability || 65}%</div>
+            </div>
+            <div class="panel-stat-card">
+              <div class="panel-stat-label">Status</div>
+              <div class="panel-stat-value" style="color: ${statusColor}; text-transform: uppercase;">${deal.status}</div>
+            </div>
+            <div class="panel-stat-card">
+              <div class="panel-stat-label">Connected Records</div>
+              <div class="panel-stat-value">${stakeholders.length + objections.length + (deal.keyFactors?.length || 0)}</div>
             </div>
           </div>
-          <div class="panel-section">
-            <h3>Objections (${objections.length})</h3>
-            <div class="tag-list">
-              ${objections.map(o => `<span class="tag tag-${o.category.toLowerCase()}">🛡️ ${o.category}</span>`).join('')}
+
+          <!-- Connected Stakeholders -->
+          <div>
+            <div class="panel-section-title">Connected Stakeholders (${stakeholders.length})</div>
+            <div class="connected-chips-list">
+              ${stakeholders.length > 0 ? stakeholders.map(s => `
+                <div class="connected-chip" onclick="MemoryGraph.selectNode('sh_${s.id}')">
+                  <div class="chip-left">
+                    <span>👤</span>
+                    <div>
+                      <div class="chip-role">${s.name || s.role}</div>
+                      <div class="chip-sub">${s.role} • ${s.influenceLevel || 'Decision Maker'}</div>
+                    </div>
+                  </div>
+                  <span class="chip-action">View ➔</span>
+                </div>
+              `).join('') : '<p class="chip-sub">No stakeholders recorded.</p>'}
             </div>
           </div>
-          <div class="panel-section">
-            <h3>Outcome</h3>
-            <span class="deal-status-badge ${deal.status}">${deal.status.toUpperCase()}</span>
+
+          <!-- Connected Objections -->
+          <div>
+            <div class="panel-section-title">Encountered Objections (${objections.length})</div>
+            <div class="connected-chips-list">
+              ${objections.length > 0 ? objections.map(o => `
+                <div class="connected-chip" onclick="MemoryGraph.selectNode('obj_${o.id}')">
+                  <div class="chip-left">
+                    <span>🛡️</span>
+                    <div>
+                      <div class="chip-role">${o.category}</div>
+                      <div class="chip-sub">${o.description ? (o.description.length > 35 ? o.description.substring(0, 33) + '…' : o.description) : 'Recorded objection'}</div>
+                    </div>
+                  </div>
+                  <span class="chip-action">View ➔</span>
+                </div>
+              `).join('') : '<p class="chip-sub">No active objections for this deal.</p>'}
+            </div>
           </div>
+
+          <!-- Strategies Used -->
           ${deal.keyFactors && deal.keyFactors.length > 0 ? `
-            <div class="panel-section">
-              <h3>Strategies Used</h3>
-              <ul class="bullet-list">
-                ${deal.keyFactors.map(f => `<li>${f}</li>`).join('')}
-              </ul>
+            <div>
+              <div class="panel-section-title">Applied Strategies (${deal.keyFactors.length})</div>
+              <div class="connected-chips-list">
+                ${deal.keyFactors.map(factor => `
+                  <div class="connected-chip" onclick="MemoryGraph.selectNode('strategy_${MemoryGraph.safeHash(factor)}')">
+                    <div class="chip-left">
+                      <span>🎯</span>
+                      <div>
+                        <div class="chip-role">${factor.length > 30 ? factor.substring(0, 28) + '…' : factor}</div>
+                        <div class="chip-sub">Organizational pattern</div>
+                      </div>
+                    </div>
+                    <span class="chip-action">View ➔</span>
+                  </div>
+                `).join('')}
+              </div>
             </div>
           ` : ''}
         </div>
@@ -2834,93 +2980,244 @@ const App = {
           <button class="btn btn-primary full-width" onclick="App.triggerShowWhy(${deal.id})">
             ✨ Show Why (Reasoning Chain)
           </button>
+          <button class="btn btn-ghost full-width" onclick="MemoryGraph.expandNodeNeighborhood('deal_${deal.id}')">
+            ⚡ Expand Connected Neighborhood
+          </button>
         </div>
       `;
     } 
-    else if (node.type === 'objection') {
-      const obj = node.data;
-      const stats = ObjectionAgent.getCategoryStats()[obj.category];
-      const proven = ObjectionAgent.getSuccessfulResponses(obj.category, 2);
-      
+    else if (node.type === 'stakeholder') {
+      const sh = node.data;
+      const deal = (typeof DATA !== 'undefined' && DATA.deals) ? DATA.deals.find(d => d.id === sh.dealId) : null;
+
       content = `
         <div class="panel-header">
-          <span class="panel-type-badge objection">Objection</span>
-          <h2>${obj.category}</h2>
+          <div class="panel-header-top">
+            <span class="panel-type-badge stakeholder">Stakeholder</span>
+            <button class="panel-close-btn" onclick="MemoryGraph.deselectAll()" title="Close details">✕</button>
+          </div>
+          <h2>${sh.name || sh.role}</h2>
+          <span class="panel-subtitle">${sh.role} • ${sh.influenceLevel || 'Influencer'}</span>
         </div>
         <div class="panel-body">
-          <div class="panel-section">
-            <p class="objection-quote">"${obj.description}"</p>
-          </div>
-          <div class="panel-section">
-            <h3>Historical Performance</h3>
-            <div class="perf-row"><span class="perf-label">Frequency:</span> <span class="perf-value">${stats ? stats.total : 1} cases</span></div>
-            <div class="perf-row"><span class="perf-label">Resolution Rate:</span> <span class="perf-value">${stats ? stats.resolutionRate : 50}%</span></div>
-          </div>
-          ${proven.length > 0 ? `
-            <div class="panel-section">
-              <h3>Proven Responses</h3>
-              ${proven.map(p => `
-                <div class="proven-response">
-                  <p>${p.resolution}</p>
-                  <span>Success Rate: ${p.historicalSuccessRate}%</span>
-                </div>
-              `).join('')}
+          <div class="panel-stats-grid">
+            <div class="panel-stat-card">
+              <div class="panel-stat-label">Influence</div>
+              <div class="panel-stat-value">${sh.influenceLevel || 'Decision Maker'}</div>
             </div>
-          ` : '<p class="empty-state">No proven responses yet.</p>'}
+            <div class="panel-stat-card">
+              <div class="panel-stat-label">Sentiment</div>
+              <div class="panel-stat-value" style="color: ${sh.sentiment === 'Positive' || sh.sentiment === 'Very Positive' ? '#00e5a0' : '#ffd93d'};">${sh.sentiment || 'Neutral'}</div>
+            </div>
+          </div>
+
+          ${sh.concerns && sh.concerns.length > 0 ? `
+            <div>
+              <div class="panel-section-title">Key Decision Concerns</div>
+              <ul class="bullet-list" style="margin:0; padding-left: 18px; color: var(--text-secondary);">
+                ${sh.concerns.map(c => `<li>${c}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+
+          ${deal ? `
+            <div>
+              <div class="panel-section-title">Associated Deal Account</div>
+              <div class="connected-chip" onclick="MemoryGraph.selectNode('deal_${deal.id}')">
+                <div class="chip-left">
+                  <span>💼</span>
+                  <div>
+                    <div class="chip-role">${deal.company}</div>
+                    <div class="chip-sub">${deal.industry} • $${(deal.value/1000).toFixed(0)}K</div>
+                  </div>
+                </div>
+                <span class="chip-action">View Deal ➔</span>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+        <div class="panel-footer">
+          <button class="btn btn-ghost full-width" onclick="MemoryGraph.expandNodeNeighborhood('sh_${sh.id}')">
+            ⚡ Expand Connected Neighborhood
+          </button>
+        </div>
+      `;
+    }
+    else if (node.type === 'objection') {
+      const obj = node.data;
+      const stats = (typeof ObjectionAgent !== 'undefined') ? ObjectionAgent.getCategoryStats()[obj.category] : null;
+      const deal = (typeof DATA !== 'undefined' && DATA.deals) ? DATA.deals.find(d => d.id === obj.dealId) : null;
+
+      content = `
+        <div class="panel-header">
+          <div class="panel-header-top">
+            <span class="panel-type-badge objection">Objection</span>
+            <button class="panel-close-btn" onclick="MemoryGraph.deselectAll()" title="Close details">✕</button>
+          </div>
+          <h2>${obj.category}</h2>
+          <span class="panel-subtitle">Status: ${obj.outcome === 'resolved' ? 'Resolved' : 'Active Concern'}</span>
+        </div>
+        <div class="panel-body">
+          <div style="background: rgba(255,140,66,0.06); border-left: 3px solid #ff8c42; padding: 12px; border-radius: 6px;">
+            <p style="margin:0; font-size: 13px; font-style: italic; color: #fff;">"${obj.description}"</p>
+          </div>
+
+          <div class="panel-stats-grid">
+            <div class="panel-stat-card">
+              <div class="panel-stat-label">Historical Resolution Rate</div>
+              <div class="panel-stat-value" style="color: #00e5a0;">${stats ? stats.resolutionRate : 74}%</div>
+            </div>
+            <div class="panel-stat-card">
+              <div class="panel-stat-label">Organizational Occurrences</div>
+              <div class="panel-stat-value">${stats ? stats.total : 42} cases</div>
+            </div>
+          </div>
+
+          ${obj.resolution ? `
+            <div>
+              <div class="panel-section-title">Proven Resolution Strategy</div>
+              <div class="connected-chip" onclick="MemoryGraph.selectNode('strategy_${MemoryGraph.safeHash(obj.resolution)}')">
+                <div class="chip-left">
+                  <span>🎯</span>
+                  <div>
+                    <div class="chip-role">Resolution Pattern</div>
+                    <div class="chip-sub">${obj.resolution}</div>
+                  </div>
+                </div>
+                <span class="chip-action">View ➔</span>
+              </div>
+            </div>
+          ` : ''}
+
+          ${deal ? `
+            <div>
+              <div class="panel-section-title">Originating Deal</div>
+              <div class="connected-chip" onclick="MemoryGraph.selectNode('deal_${deal.id}')">
+                <div class="chip-left">
+                  <span>💼</span>
+                  <div>
+                    <div class="chip-role">${deal.company}</div>
+                    <div class="chip-sub">${deal.industry} • $${(deal.value/1000).toFixed(0)}K</div>
+                  </div>
+                </div>
+                <span class="chip-action">View Deal ➔</span>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+        <div class="panel-footer">
+          <button class="btn btn-ghost full-width" onclick="MemoryGraph.expandNodeNeighborhood('obj_${obj.id}')">
+            ⚡ Expand Connected Neighborhood
+          </button>
         </div>
       `;
     }
     else if (node.type === 'strategy') {
       const strategyName = node.data.strategy;
-      const confidence = MemoryStore.getStrategyConfidence(strategyName);
-      
-      // Find all deals that used this strategy
-      const dealsUsing = DATA.deals.filter(d => (d.keyFactors || []).includes(strategyName));
+      const confidence = (typeof MemoryStore !== 'undefined') ? MemoryStore.getStrategyConfidence(strategyName) : 88;
+      const dealsUsing = (typeof DATA !== 'undefined' && DATA.deals) ? DATA.deals.filter(d => (d.keyFactors || []).includes(strategyName)) : [];
       const wins = dealsUsing.filter(d => d.status === 'won').length;
-      const industries = [...new Set(dealsUsing.map(d => d.industry))];
 
       content = `
         <div class="panel-header">
-          <span class="panel-type-badge strategy">Strategy</span>
-          <h2>Pattern / Strategy</h2>
+          <div class="panel-header-top">
+            <span class="panel-type-badge strategy">Strategy Pattern</span>
+            <button class="panel-close-btn" onclick="MemoryGraph.deselectAll()" title="Close details">✕</button>
+          </div>
+          <h2>Strategy Intelligence</h2>
+          <span class="panel-subtitle">Learned organizational playbook rule</span>
         </div>
         <div class="panel-body">
-          <div class="panel-section">
-            <p class="strategy-text">${strategyName}</p>
+          <div style="background: rgba(0,229,160,0.06); border-left: 3px solid #00e5a0; padding: 12px; border-radius: 6px;">
+            <p style="margin:0; font-size: 14px; font-weight: 500; color: #fff;">${strategyName}</p>
           </div>
-          <div class="panel-section">
-            <h3>Performance Stats</h3>
-            <div class="perf-row"><span class="perf-label">Confidence Score:</span> <span class="perf-value strategy-score">${confidence}%</span></div>
-            <div class="perf-row"><span class="perf-label">Wins Influenced:</span> <span class="perf-value">${wins}</span></div>
-            <div class="perf-row"><span class="perf-label">Times Used:</span> <span class="perf-value">${dealsUsing.length}</span></div>
-          </div>
-          <div class="panel-section">
-            <h3>Effective Industries</h3>
-            <div class="tag-list">
-              ${industries.map(i => `<span class="tag">🏢 ${i}</span>`).join('')}
+
+          <div class="panel-stats-grid">
+            <div class="panel-stat-card">
+              <div class="panel-stat-label">Confidence Score</div>
+              <div class="panel-stat-value" style="color: #00e5a0;">${confidence}%</div>
+            </div>
+            <div class="panel-stat-card">
+              <div class="panel-stat-label">Deals Influenced</div>
+              <div class="panel-stat-value">${dealsUsing.length || 1} deals (${wins} won)</div>
             </div>
           </div>
+
+          ${dealsUsing.length > 0 ? `
+            <div>
+              <div class="panel-section-title">Correlated Accounts</div>
+              <div class="connected-chips-list">
+                ${dealsUsing.slice(0, 3).map(d => `
+                  <div class="connected-chip" onclick="MemoryGraph.selectNode('deal_${d.id}')">
+                    <div class="chip-left">
+                      <span>💼</span>
+                      <div>
+                        <div class="chip-role">${d.company}</div>
+                        <div class="chip-sub">${d.industry} • Status: ${d.status.toUpperCase()}</div>
+                      </div>
+                    </div>
+                    <span class="chip-action">View ➔</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+        <div class="panel-footer">
+          <button class="btn btn-ghost full-width" onclick="MemoryGraph.expandNodeNeighborhood('${node.id}')">
+            ⚡ Expand Connected Neighborhood
+          </button>
         </div>
       `;
     }
     else {
-      // Stakeholder or Outcome
+      // Outcome node
+      const deal = node.data;
+      const isWon = deal?.status === 'won';
+      const outcomeColor = isWon ? '#00e5a0' : (deal?.status === 'lost' ? '#ff5252' : '#ffd93d');
+
       content = `
         <div class="panel-header">
-          <span class="panel-type-badge ${node.type}">${node.type}</span>
+          <div class="panel-header-top">
+            <span class="panel-type-badge outcome">Outcome Node</span>
+            <button class="panel-close-btn" onclick="MemoryGraph.deselectAll()" title="Close details">✕</button>
+          </div>
           <h2>${node.label}</h2>
+          <span class="panel-subtitle">Result for ${deal?.company || 'Account'}</span>
         </div>
         <div class="panel-body">
-          <p>More details available for Deals, Objections, and Strategies.</p>
+          <div class="panel-stat-card" style="border-left: 3px solid ${outcomeColor};">
+            <div class="panel-stat-label">Recorded Outcome</div>
+            <div class="panel-stat-value" style="color: ${outcomeColor};">${deal?.status ? deal.status.toUpperCase() : 'ACTIVE'}</div>
+          </div>
+
+          ${deal ? `
+            <div>
+              <div class="panel-section-title">Associated Deal Account</div>
+              <div class="connected-chip" onclick="MemoryGraph.selectNode('deal_${deal.id}')">
+                <div class="chip-left">
+                  <span>💼</span>
+                  <div>
+                    <div class="chip-role">${deal.company}</div>
+                    <div class="chip-sub">$${(deal.value/1000).toFixed(0)}K • ${deal.industry}</div>
+                  </div>
+                </div>
+                <span class="chip-action">View Deal ➔</span>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+        <div class="panel-footer">
+          <button class="btn btn-ghost full-width" onclick="MemoryGraph.deselectAll()">
+            Clear Selection
+          </button>
         </div>
       `;
     }
 
     panel.innerHTML = content;
-    
-    // Add visual feedback class
     panel.classList.remove('animate-slide-in');
-    void panel.offsetWidth; // trigger reflow
+    void panel.offsetWidth;
     panel.classList.add('animate-slide-in');
   },
 
@@ -2928,48 +3225,61 @@ const App = {
     if (typeof MemoryGraph !== 'undefined') {
       MemoryGraph.highlightReasoningChain(dealId);
       
+      const deal = (typeof DATA !== 'undefined' && DATA.deals) ? DATA.deals.find(d => d.id === dealId) : null;
+      const companyName = deal ? deal.company : `Deal #${dealId}`;
+
       const panel = document.getElementById('graph-side-panel');
+      if (!panel) return;
+
       panel.innerHTML = `
         <div class="panel-header reasoning-header">
+          <div class="panel-header-top">
+            <span class="panel-type-badge deal">Reasoning Path</span>
+            <button class="panel-close-btn" onclick="MemoryGraph.deselectAll()" title="Close details">✕</button>
+          </div>
           <h2>✨ Memory Path Active</h2>
-          <p>Highlighting the reasoning chain for Deal #${dealId}</p>
+          <span class="panel-subtitle">Reasoning trajectory for ${companyName}</span>
         </div>
         <div class="panel-body reasoning-body">
           <div class="reasoning-step">
             <span class="r-icon">💼</span>
             <div class="r-content">
-              <strong>Source Deal</strong>
-              <p>The deal context being analyzed.</p>
+              <strong>1. Source Deal Context</strong>
+              <p>Analyzing ${companyName} in ${deal?.industry || 'enterprise'} market ($${deal ? (deal.value/1000).toFixed(0) : '350'}K value).</p>
             </div>
           </div>
           <div class="reasoning-step">
             <span class="r-icon">🛡️</span>
             <div class="r-content">
-              <strong>Objections Encountered</strong>
-              <p>Challenges identified in this deal.</p>
+              <strong>2. Stakeholders & Objections</strong>
+              <p>Identified key decision makers and specific friction points.</p>
             </div>
           </div>
           <div class="reasoning-step">
             <span class="r-icon">🎯</span>
             <div class="r-content">
-              <strong>Strategies Applied</strong>
-              <p>Proven approaches used to resolve those specific objections.</p>
+              <strong>3. Proven Strategies</strong>
+              <p>Correlated with resolution patterns that historical win records verified.</p>
             </div>
           </div>
           <div class="reasoning-step">
             <span class="r-icon">🏆</span>
             <div class="r-content">
-              <strong>Historical Outcomes</strong>
-              <p>Past wins driven by these same strategies.</p>
+              <strong>4. Historical Win Correlation</strong>
+              <p>Validates win probability grounded in real organizational memory.</p>
             </div>
           </div>
         </div>
         <div class="panel-footer">
           <button class="btn btn-ghost full-width" onclick="MemoryGraph.resetHighlights(); App.showGraphNodeDetails(MemoryGraph.nodesData.find(n => n.id === 'deal_${dealId}'))">
-            Clear Highlights
+            Clear Path Highlights
           </button>
         </div>
       `;
+
+      panel.classList.remove('animate-slide-in');
+      void panel.offsetWidth;
+      panel.classList.add('animate-slide-in');
     }
   },
 
